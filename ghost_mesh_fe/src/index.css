@@ -1,0 +1,188 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.95);
+  background-color: #05060b;
+
+  --neon-cyan: #00f2fe;
+  --neon-cyan-glow: rgba(0, 242, 254, 0.35);
+  --neon-purple: #b92b27;
+  --neon-purple-glow: rgba(185, 43, 39, 0.35);
+  --glass-bg: rgba(13, 16, 27, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --sidebar-width: 260px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at 10% 20%, rgba(13, 16, 35, 0.95) 0%, rgba(5, 6, 11, 0.98) 90.2%);
+  overflow-x: hidden;
+}
+
+/* Background animated glow spots */
+.bg-glow-spot-1 {
+  position: fixed;
+  top: 10%;
+  left: 15%;
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(0, 242, 254, 0.06) 0%, transparent 70%);
+  z-index: -1;
+  pointer-events: none;
+  animation: floatGlow 15s infinite alternate ease-in-out;
+}
+
+.bg-glow-spot-2 {
+  position: fixed;
+  bottom: 10%;
+  right: 15%;
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, rgba(138, 35, 135, 0.07) 0%, transparent 70%);
+  z-index: -1;
+  pointer-events: none;
+  animation: floatGlow 20s infinite alternate-reverse ease-in-out;
+}
+
+@keyframes floatGlow {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(50px, 30px) scale(1.15); }
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.01);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-cyan-glow);
+}
+
+/* Glassmorphism panels */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+.glass-panel:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 242, 254, 0.05);
+}
+
+/* Custom interactive glowing card */
+.glowing-card {
+  background: rgba(16, 20, 35, 0.45);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.glowing-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, var(--neon-cyan), #a83279);
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+
+.glowing-card:hover {
+  transform: translateY(-5px);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 242, 254, 0.1);
+}
+
+.glowing-card:hover::before {
+  opacity: 1;
+}
+
+/* Typing indicator micro-animation */
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  background-color: var(--neon-cyan);
+  border-radius: 50%;
+  animation: bounceDot 1.4s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounceDot {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1.0); }
+}
+
+/* Custom fade out effect for vanishing sessions */
+@keyframes dissolve {
+  0% {
+    filter: blur(0) grayscale(0);
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    filter: blur(12px) grayscale(100%);
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+.dissolving {
+  animation: dissolve 2.5s forwards cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  pointer-events: none;
+}
+
+/* Custom glowing scrollbar for chat */
+.chat-scroll {
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.pulse-border {
+  animation: pulseBorder 2s infinite alternate;
+}
+
+@keyframes pulseBorder {
+  0% { border-color: rgba(0, 242, 254, 0.2); box-shadow: 0 0 5px rgba(0, 242, 254, 0.1); }
+  100% { border-color: rgba(0, 242, 254, 0.6); box-shadow: 0 0 15px rgba(0, 242, 254, 0.3); }
+}

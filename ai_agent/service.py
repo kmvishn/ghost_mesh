@@ -69,9 +69,13 @@ class AICharacterService:
 
     def list_ai_characters(self, current_user: CurrentUser):
         try:
-            stmt = select(AICharacter.id, AICharacter.name).where(
-                AICharacter.owner_id == current_user.get_uuid()
-            )
+            stmt = select(
+                AICharacter.id,
+                AICharacter.name,
+                AICharacter.description,
+                AICharacter.personality_traits,
+                AICharacter.avatar_url,
+            ).where(AICharacter.owner_id == current_user.get_uuid())
             ai_characters = self.db.execute(stmt).mappings().all()
             return ai_characters
         except Exception as e:

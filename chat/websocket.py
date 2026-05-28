@@ -12,7 +12,7 @@ ws_router = APIRouter()
 
 
 @ws_router.websocket("/ws/chat/{session_id}")
-async def chat_socket(
+async def chat_socket(          
     websocket: WebSocket,
     session_id: str,
 ):

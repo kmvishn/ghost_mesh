@@ -11,8 +11,12 @@ class AICharacterRequest(BaseModel):
 
 class AICharacterResponse(AICharacterRequest):
     id: UUID
+    avatar_url: str | None = None
 
 
 class AICharacterListResponse(BaseModel):
     id: UUID
     name: str
+    description: str | None = None
+    personality_traits: str | None = None
+    avatar_url: str | None = None

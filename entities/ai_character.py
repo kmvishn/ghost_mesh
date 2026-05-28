@@ -11,7 +11,7 @@ class AICharacter(Base):
     __tablename__ = "ai_characters"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, unique=True, nullable=False)
+    name = Column(String, unique=False, nullable=False)
     description = Column(String, nullable=False)
     personality_traits = Column(String, nullable=True)
     avatar_url = Column(String, nullable=True)
