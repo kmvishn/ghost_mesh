@@ -13,6 +13,8 @@ from utils.compress_image import compress_image_under_300kb
 
 @celery_client.task
 def generate_avatar(ai_character_id: str):
+    import entities.users
+    import entities.chat
     from entities.ai_character import AICharacter
 
     BASE_PROMPT = (

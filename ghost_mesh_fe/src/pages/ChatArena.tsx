@@ -2,9 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   listCharacters, 
   createChatSession, 
+  listChatSessions,
+  fetchSessionMessages,
   getAuthToken, 
   WS_BASE_URL,
-  type AICharacter 
+  type AICharacter,
+  type ChatSession
 } from '../apis/api';
 import { 
   Box, 
@@ -39,24 +42,18 @@ interface Message {
   user?: string; // handles default {"user": "Begin"}
 }
 
-interface SavedSession {
-  id: string;
-  characterIds: string[];
-  characterNames: string[];
-  createdAt: number;
-}
-
 const CHAT_SESSION_TTL = 3600; // 60 minutes
 
 const ChatArena: React.FC = () => {
   const [characters, setCharacters] = useState<AICharacter[]>([]);
   const [selectedCharIds, setSelectedCharIds] = useState<string[]>([]);
-  const [recentSessions, setRecentSessions] = useState<SavedSession[]>([]);
+  const [sessionTitle, setSessionTitle] = useState('');
+  const [recentSessions, setRecentSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Active Session state
-  const [activeSession, setActiveSession] = useState<SavedSession | null>(null);
+  const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -74,11 +71,9 @@ const ChatArena: React.FC = () => {
         const list = await listCharacters();
         setCharacters(list);
 
-        // Load saved sessions from localStorage
-        const stored = localStorage.getItem('ghostmesh_sessions');
-        if (stored) {
-          setRecentSessions(JSON.parse(stored));
-        }
+        // Load saved sessions directly from DB
+        const dbSessions = await listChatSessions();
+        setRecentSessions(dbSessions);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Grid synch failed');
       } finally {
@@ -114,13 +109,6 @@ const ChatArena: React.FC = () => {
       if (timerRef.current) window.clearInterval(timerRef.current);
     };
   }, [activeSession]);
-
-  // Save session messages in localStorage for persistence across reloads
-  useEffect(() => {
-    if (activeSession && messages.length > 0) {
-      localStorage.setItem(`ghostmesh_session_msg_${activeSession.id}`, JSON.stringify(messages));
-    }
-  }, [messages, activeSession]);
 
   // Scroll to bottom when messages arrive
   useEffect(() => {
@@ -202,28 +190,16 @@ const ChatArena: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const session = await createChatSession(selectedCharIds);
+      const session = await createChatSession(selectedCharIds, sessionTitle || undefined);
       
-      const charNames = selectedCharIds.map(id => {
-        const match = characters.find(c => c.id === id);
-        return match ? match.name : 'Unknown';
-      });
+      // Update session registry directly from DB
+      const dbSessions = await listChatSessions();
+      setRecentSessions(dbSessions);
+      setSessionTitle('');
 
-      const newSavedSession: SavedSession = {
-        id: session.session_id,
-        characterIds: selectedCharIds,
-        characterNames: charNames,
-        createdAt: Date.now()
-      };
-
-      // Add to list and save to localStorage
-      const updatedSessions = [newSavedSession, ...recentSessions.filter(s => s.id !== session.session_id)];
-      setRecentSessions(updatedSessions);
-      localStorage.setItem('ghostmesh_sessions', JSON.stringify(updatedSessions));
-
-      // Set active
+      // Set active session
       setMessages([]);
-      setActiveSession(newSavedSession);
+      setActiveSession(session);
       connectWebSocket(session.session_id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to instantiate chat arena session');
@@ -232,18 +208,26 @@ const ChatArena: React.FC = () => {
     }
   };
 
-  const handleReconnectSession = (session: SavedSession) => {
+  const handleReconnectSession = async (session: ChatSession) => {
     setError('');
-    // Load local history if it exists
-    const localHistory = localStorage.getItem(`ghostmesh_session_msg_${session.id}`);
-    if (localHistory) {
-      setMessages(JSON.parse(localHistory));
-    } else {
-      setMessages([]);
-    }
+    setLoading(true);
+    try {
+      const history = await fetchSessionMessages(session.session_id);
+      const formattedHistory = history
+        .filter(m => m.sender_type !== 'system')
+        .map(m => ({
+          name: m.sender_name,
+          message: m.message
+        }));
 
-    setActiveSession(session);
-    connectWebSocket(session.id);
+      setMessages(formattedHistory);
+      setActiveSession(session);
+      connectWebSocket(session.session_id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch historical session data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -316,6 +300,15 @@ const ChatArena: React.FC = () => {
     return {};
   };
 
+  const getCharacterNamesForSession = (sessionCharIds: string[]) => {
+    return sessionCharIds
+      .map(id => {
+        const match = characters.find(c => c.id === id);
+        return match ? match.name : 'Unknown';
+      })
+      .filter(name => name !== 'Unknown');
+  };
+
   if (loading && !activeSession) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
@@ -359,7 +352,7 @@ const ChatArena: React.FC = () => {
               {characters.length === 0 ? (
                 <Box sx={{ textAlign: 'center', my: 'auto', py: 4 }}>
                   <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.4)', mb: 2 }}>
-                    Your soul roster is currently empty.
+                    Your roster is currently empty.
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.3)' }}>
                     Go to the <b>AI Character Hub</b> to synthesize your first digital entity!
@@ -367,6 +360,29 @@ const ChatArena: React.FC = () => {
                 </Box>
               ) : (
                 <>
+                  <TextField
+                    label="Session Title (Optional)"
+                    variant="outlined"
+                    value={sessionTitle}
+                    onChange={(e) => setSessionTitle(e.target.value)}
+                    placeholder="e.g. Operation Cyber-Resonance"
+                    fullWidth
+                    sx={{
+                      mb: 3,
+                      '& .MuiOutlinedInput-root': {
+                        color: 'white',
+                        '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
+                        '&:hover fieldset': { borderColor: 'rgba(0, 242, 254, 0.3)' },
+                        '&.Mui-focused fieldset': { borderColor: '#00f2fe' },
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        borderRadius: 2
+                      },
+                      '& .MuiInputLabel-root': {
+                        color: 'rgba(255, 255, 255, 0.5)',
+                        '&.Mui-focused': { color: '#00f2fe' }
+                      }
+                    }}
+                  />
                   <Box sx={{ flexGrow: 1, overflowY: 'auto', mb: 3, pr: 1 }}>
                     <FormGroup sx={{ gap: 2 }}>
                       {characters.map(char => (
@@ -454,7 +470,7 @@ const ChatArena: React.FC = () => {
                 EPHEMERAL CHAT REGISTRY
               </Typography>
               <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.5)', mb: 3 }}>
-                Reconnect to active sessions cached in your browser.
+                Reconnect to active database-backed sessions.
               </Typography>
 
               {recentSessions.length === 0 ? (
@@ -466,44 +482,47 @@ const ChatArena: React.FC = () => {
                 </Box>
               ) : (
                 <List sx={{ overflowY: 'auto', flexGrow: 1, pr: 1 }}>
-                  {recentSessions.map((session, index) => (
-                    <React.Fragment key={session.id}>
-                      <ListItem 
-                        onClick={() => handleReconnectSession(session)}
-                        sx={{
-                          borderRadius: 3,
-                          mb: 1,
-                          cursor: 'pointer',
-                          background: 'rgba(255, 255, 255, 0.02)',
-                          border: '1px solid rgba(255, 255, 255, 0.04)',
-                          transition: 'all 0.3s',
-                          '&:hover': {
-                            background: 'rgba(0, 242, 254, 0.04)',
-                            borderColor: 'rgba(0, 242, 254, 0.2)'
-                          }
-                        }}
-                      >
-                        <ListItemAvatar>
-                          <Avatar sx={{ background: 'rgba(0, 242, 254, 0.1)', color: '#00f2fe' }}>
-                            <RadioButtonCheckedIcon />
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText 
-                          primary={
-                            <Typography sx={{ color: 'white', fontWeight: 600, fontSize: '0.95rem' }}>
-                              Session: {session.characterNames.join(', ')}
-                            </Typography>
-                          }
-                          secondary={
-                            <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.4)' }}>
-                              Opened: {new Date(session.createdAt).toLocaleTimeString()}
-                            </Typography>
-                          }
-                        />
-                      </ListItem>
-                      {index < recentSessions.length - 1 && <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.04)' }} />}
-                    </React.Fragment>
-                  ))}
+                  {recentSessions.map((session, index) => {
+                    const charNames = getCharacterNamesForSession(session.character_ids);
+                    return (
+                      <React.Fragment key={session.session_id}>
+                        <ListItem 
+                          onClick={() => handleReconnectSession(session)}
+                          sx={{
+                            borderRadius: 3,
+                            mb: 1,
+                            cursor: 'pointer',
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            border: '1px solid rgba(255, 255, 255, 0.04)',
+                            transition: 'all 0.3s',
+                            '&:hover': {
+                              background: 'rgba(0, 242, 254, 0.04)',
+                              borderColor: 'rgba(0, 242, 254, 0.2)'
+                            }
+                          }}
+                        >
+                          <ListItemAvatar>
+                            <Avatar sx={{ background: 'rgba(0, 242, 254, 0.1)', color: '#00f2fe' }}>
+                              <RadioButtonCheckedIcon />
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText 
+                            primary={
+                              <Typography sx={{ color: 'white', fontWeight: 600, fontSize: '0.95rem' }}>
+                                {session.title}
+                              </Typography>
+                            }
+                            secondary={
+                              <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.4)' }}>
+                                Opened: {new Date(session.created_at).toLocaleString()} | Entities: {charNames.join(', ')}
+                              </Typography>
+                            }
+                          />
+                        </ListItem>
+                        {index < recentSessions.length - 1 && <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.04)' }} />}
+                      </React.Fragment>
+                    );
+                  })}
                 </List>
               )}
             </Paper>
@@ -538,10 +557,10 @@ const ChatArena: React.FC = () => {
               <Box className="pulse-border" sx={{ width: 10, height: 10, borderRadius: '50%', background: '#00f2fe' }} />
               <Box>
                 <Typography variant="h6" sx={{ color: 'white', fontWeight: 700, fontSize: '1rem', lineHeight: 1.2 }}>
-                  GHOST LINK ACTIVE
+                  {activeSession.title.toUpperCase()}
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
-                  Resonating with: {activeSession.characterNames.join(', ')}
+                  Resonating with: {getCharacterNamesForSession(activeSession.character_ids).join(', ')}
                 </Typography>
               </Box>
             </Box>

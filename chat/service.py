@@ -36,6 +36,15 @@ class ChatSessionManager:
         self.refresh_ttl(session_id)
         return session_id
 
+    def create_persistent_session(self, session_id: UUID, user_id: UUID, character_ids: list[UUID]) -> None:
+        sid = str(session_id)
+        redis_client.set(f"session:{sid}:owner_id", str(user_id))
+        if character_ids:
+            redis_client.sadd(
+                f"session:{sid}:characters", *[str(cid) for cid in character_ids]
+            )
+        self.refresh_ttl(sid)
+
     def get_ai_characters(self, session_id: str):
         return [
             UUID(cid)

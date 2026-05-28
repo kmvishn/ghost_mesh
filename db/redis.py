@@ -1,4 +1,6 @@
 import logging
+import redis
+from config import settings
 
 class MockRedis:
     def __init__(self):
@@ -65,5 +67,14 @@ class MockRedis:
     def expire(self, key, time):
         return True
 
-# Export the in-memory engine instance directly to prevent any external socket attempts
-redis_client = MockRedis()
+# Initialize client with robust connection check
+try:
+    logging.info("Attempting to connect to real Redis server...")
+    real_client = redis.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=3.0)
+    # Ping the server to verify active link
+    real_client.ping()
+    logging.info("Successfully connected to real Redis server.")
+    redis_client = real_client
+except Exception as e:
+    logging.warning(f"Failed to connect to real Redis: {e}. Falling back to MockRedis.")
+    redis_client = MockRedis()

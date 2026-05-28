@@ -2,7 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api import register_routes
+from db.core import engine, Base
+# Import all entities to ensure they are registered on Base
+import entities.users
+import entities.ai_character
+import entities.chat
 
+# Create all tables in database
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 

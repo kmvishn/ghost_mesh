@@ -84,19 +84,33 @@ async def get_llm_response(
     websocket: WebSocket,
     session_id: str,
 ) -> str:
+    from db.core import SessionLocal
+    from entities.chat import DbChatMessage
+    from uuid import UUID, uuid4
+    from contextlib import closing
+
     loop = asyncio.get_running_loop()
     response = await loop.run_in_executor(_executor, _call_gemini, instruction, context)
-    if response:
-        payload = {"name": ai_character_name, "message": response.text}
-        await websocket.send_json(payload)
-        session_manager.add_message(session_id, payload)
-    else:
-        payload = {
-            "name": ai_character_name,
-            "message": "I am sorry, I am not able to generate a response",
-        }
-        await websocket.send_json(payload)
-        session_manager.add_message(session_id, payload)
+    text_content = response.text if response else "I am sorry, I am not able to generate a response"
+    
+    payload = {"name": ai_character_name, "message": text_content}
+    await websocket.send_json(payload)
+    session_manager.add_message(session_id, payload)
+
+    # Persist in DB
+    try:
+        with closing(SessionLocal()) as db:
+            db_msg = DbChatMessage(
+                id=uuid4(),
+                session_id=UUID(session_id),
+                sender_name=ai_character_name,
+                sender_type="model",
+                message=text_content
+            )
+            db.add(db_msg)
+            db.commit()
+    except Exception as e:
+        logger.error(f"Failed to persist AI message in DB: {e}")
 
 
 async def generate_ai_character_response(

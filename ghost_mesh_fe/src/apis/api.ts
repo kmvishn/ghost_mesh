@@ -154,13 +154,32 @@ export const deleteCharacter = async (characterId: string): Promise<void> => {
 export interface ChatSession {
   session_id: string;
   websocket_url: string;
+  title: string;
+  character_ids: string[];
+  created_at: string;
 }
 
-export const createChatSession = async (characterIds: string[]): Promise<ChatSession> => {
+export interface ChatMessage {
+  sender_name: string;
+  sender_type: string;
+  message: string;
+  created_at?: string;
+}
+
+export const createChatSession = async (characterIds: string[], title?: string): Promise<ChatSession> => {
   return fetchWithAuth('/chat/sessions', {
     method: 'POST',
     body: JSON.stringify({
       character_ids: characterIds,
+      title: title || undefined
     }),
   });
+};
+
+export const listChatSessions = async (): Promise<ChatSession[]> => {
+  return fetchWithAuth('/chat/sessions');
+};
+
+export const fetchSessionMessages = async (sessionId: string): Promise<ChatMessage[]> => {
+  return fetchWithAuth(`/chat/sessions/${sessionId}/messages`);
 };

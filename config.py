@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str
     REDIS_URL: str
     REDIS_CELERY_BROKER: str
-    CHAT_SESSION_TTL: int
+    CHAT_SESSION_TTL: int = 3600
     AWS_ENDPOINT_URL: str
     AWS_ACCESS_KEY_ID: str
     AWS_SECRET_ACCESS_KEY: str

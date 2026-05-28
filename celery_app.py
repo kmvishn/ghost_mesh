@@ -17,8 +17,8 @@ celery_client.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    task_always_eager=True,
-    task_eager_propagates=True,
+    task_always_eager=False,
+    task_eager_propagates=False,
     include=["tasks.task_generate_avatar"],
 )
 celery_client.autodiscover_tasks()
