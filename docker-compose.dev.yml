@@ -5,7 +5,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: api
+    container_name: api-dev
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
     env_file:
       - .env
     ports:
@@ -16,8 +19,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: celery
+    container_name: celery-dev
     command: celery -A celery_app.celery_client worker --pool=threads -l info
+    volumes:
+      - .:/app
     env_file:
       - .env
     restart: always
@@ -26,8 +31,11 @@ services:
     build:
       context: ./ghost_mesh_fe
       dockerfile: Dockerfile
-      target: prod
-    container_name: frontend
+      target: dev
+    container_name: frontend-dev
+    volumes:
+      - ./ghost_mesh_fe:/app
+      - /app/node_modules
     ports:
-      - "80:80"
+      - "5173:5173"
     restart: always
